@@ -45,3 +45,48 @@ class IdempotencyKeyReusedException(AppException):
             code="IDEMPOTENCY_KEY_REUSED",
             message=message,
         )
+
+
+class SlotTakenException(AppException):
+
+    def __init__(self, message: str = "This slot is already booked"):
+        super().__init__(
+            status_code=409,
+            code="SLOT_TAKEN",
+            message=message,
+        )
+
+
+class BookingLimitReachedException(AppException):
+
+    def __init__(
+        self,
+        message: str = (
+            "User cannot have more than 2 active upcoming bookings at any time"
+        ),
+    ):
+        super().__init__(
+            status_code=409,
+            code="BOOKING_LIMIT_REACHED",
+            message=message,
+        )
+
+
+class BookingNotFoundException(AppException):
+
+    def __init__(self, message: str = "Booking not found"):
+        super().__init__(
+            status_code=404,
+            code="NOT_FOUND",
+            message=message,
+        )
+
+
+class BookingAlreadyCancelledException(AppException):
+
+    def __init__(self, message: str = "Booking is already cancelled"):
+        super().__init__(
+            status_code=400,
+            code="ALREADY_CANCELLED",
+            message=message,
+        )

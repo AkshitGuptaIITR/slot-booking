@@ -1,7 +1,7 @@
 from datetime import datetime
 import uuid
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_serializer
 
 from app.models.booking import BookingStatus
 
@@ -24,3 +24,8 @@ class BookingResponse(BaseModel):
         populate_by_name=True,
         json_encoders={datetime: lambda dt: dt.strftime("%Y-%m-%dT%H:%M:%SZ")},
     )
+
+    @field_serializer("slot_start")
+    def serialize_slot_start(self, dt: datetime, _info) -> str:
+        # Ensures UTC timestamp formatting with 'Z' suffix
+        return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
