@@ -69,7 +69,7 @@ async def create_booking(
             )
 
     # 3. Validate Slot Rules (aligned to 30 mins, 09:00-17:00 IST, Mon-Fri, <= 14 days)
-    validate_booking_slot(payload.slotStart)
+    validate_booking_slot(payload.slot_start)
 
     # 4. Transaction & Concurrency Control
     # Lock on user_id prevents concurrent requests from exceeding the 2-booking limit
@@ -91,12 +91,20 @@ async def create_booking(
             "User cannot have more than 2 active upcoming bookings at any time"
         )
 
-    # 6. Insert Booking inside a savepoint to catch slot collision
+    # 6. Check if slot is already actively booked
+    existing_slot_stmt = select(Booking.id).where(
+        Booking.slot_start == payload.slot_start,
+        Booking.status == BookingStatus.ACTIVE,
+    )
+    if await db.scalar(existing_slot_stmt):
+        raise SlotTakenException("This slot is already booked")
+
+    # 7. Insert Booking inside a savepoint to catch slot collision
     new_booking = Booking(
         user_id=user_id,
         name=payload.name,
         email=payload.email,
-        slot_start=payload.slotStart,
+        slot_start=payload.slot_start,
         status=BookingStatus.ACTIVE,
     )
 
@@ -111,7 +119,7 @@ async def create_booking(
     # 7. Prepare response payload
     response_body = {
         "id": str(new_booking.id),
-        "slotStart": new_booking.slot_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "slot_start": new_booking.slot_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "name": new_booking.name,
         "email": new_booking.email,
         "status": new_booking.status.value,

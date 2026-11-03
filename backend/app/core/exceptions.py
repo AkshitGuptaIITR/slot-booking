@@ -28,7 +28,7 @@ class InvalidSlotException(AppException):
         details: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(
-            status_code=400,
+            status_code=422,
             code="INVALID_SLOT",
             message=message,
             details=details,

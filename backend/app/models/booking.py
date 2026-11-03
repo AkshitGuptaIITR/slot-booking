@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 import enum
 
-from sqlalchemy import DateTime, String, Uuid, Enum as SAEnum
+from sqlalchemy import DateTime, Index, String, Uuid, Enum as SAEnum, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -30,4 +30,13 @@ class Booking(Base):
     )
     cancelled_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
+    )
+
+    __table_args__ = (
+        Index(
+            "idx_unique_active_slot",
+            "slot_start",
+            unique=True,
+            postgresql_where=text("status = 'ACTIVE'"),
+        ),
     )
