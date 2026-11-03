@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 
 import Header from './components/Header'
 import AlertBanner from './components/AlertBanner'
@@ -100,6 +100,37 @@ export default function App() {
       setLoadingBookings(false)
     }
   }
+
+  // Auto-refresh slots and bookings on tab focus, visibility change, and every 60s to prevent stale data
+  useEffect(() => {
+    if (!submittedUser || !submittedDate) return
+
+    const refreshIfIdle = () => {
+      // Don't interrupt if the user is in the middle of typing in the booking modal
+      if (!activeSlotModal) {
+        handleFetchSlots(submittedUser, submittedDate)
+        handleFetchBookings(submittedUser, true)
+      }
+    }
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshIfIdle()
+      }
+    }
+
+    window.addEventListener('focus', refreshIfIdle)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    // Periodic 60-second background poll
+    const pollInterval = setInterval(refreshIfIdle, 60000)
+
+    return () => {
+      window.removeEventListener('focus', refreshIfIdle)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      clearInterval(pollInterval)
+    }
+  }, [submittedUser, submittedDate, activeSlotModal])
 
   // Date selection (instantly fetches slots if user name exists)
   const handleDateChange = (newDate) => {

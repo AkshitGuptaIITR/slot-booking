@@ -15,17 +15,28 @@ export default function BookingModal({
   initialHoldSeconds = 120,
 }) {
   const [secondsLeft, setSecondsLeft] = useState(initialHoldSeconds)
+  const [isSlotInPast, setIsSlotInPast] = useState(false)
 
-  // Sync initial seconds whenever a new slot is opened
+  // Sync initial seconds and check past status whenever slot changes
   useEffect(() => {
     setSecondsLeft(initialHoldSeconds)
+    if (slot?.start) {
+      setIsSlotInPast(new Date(slot.start).getTime() <= Date.now())
+    }
   }, [slot, initialHoldSeconds])
 
   // 1-second countdown interval
   useEffect(() => {
     if (!slot) return
 
+    const checkPast = () => {
+      if (new Date(slot.start).getTime() <= Date.now()) {
+        setIsSlotInPast(true)
+      }
+    }
+
     const timer = setInterval(() => {
+      checkPast()
       setSecondsLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer)
@@ -40,7 +51,7 @@ export default function BookingModal({
 
   if (!slot) return null
 
-  const isExpired = secondsLeft <= 0
+  const isExpired = secondsLeft <= 0 || isSlotInPast
   const minutes = Math.floor(secondsLeft / 60)
   const seconds = secondsLeft % 60
   const formattedCountdown = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
@@ -80,10 +91,16 @@ export default function BookingModal({
             <span className="text-base">{isExpired ? '⚠️' : '🔒'}</span>
             <div>
               <span className="font-bold">
-                {isExpired ? 'Hold Expired' : 'Slot Held Exclusively For You'}
+                {isSlotInPast
+                  ? 'Slot Has Started'
+                  : isExpired
+                  ? 'Hold Expired'
+                  : 'Slot Held Exclusively For You'}
               </span>
               <p className="text-[11px] opacity-80">
-                {isExpired
+                {isSlotInPast
+                  ? 'This slot start time has passed. Please close and select a future slot.'
+                  : isExpired
                   ? 'Your reservation window closed. Please select the slot again.'
                   : 'Other users cannot book this slot while you complete the form.'}
               </p>
@@ -98,7 +115,7 @@ export default function BookingModal({
                 : 'bg-emerald-200/80 text-emerald-950'
             }`}
           >
-            {formattedCountdown}
+            {isSlotInPast ? '00:00' : formattedCountdown}
           </div>
         </div>
 

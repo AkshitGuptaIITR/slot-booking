@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { formatDisplayDate, formatTime, isWeekend } from '../utils/datetime'
 
 export default function SlotsGrid({
@@ -10,6 +11,16 @@ export default function SlotsGrid({
   onSelectSlot,
   hasError,
 }) {
+  // Local time ticker updating every 10 seconds to dynamically expire slots in real time
+  const [currentTime, setCurrentTime] = useState(() => Date.now())
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now())
+    }, 10000)
+    return () => clearInterval(timer)
+  }, [])
+
   return (
     <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200/80 p-6 sm:p-8 space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-2">
@@ -36,9 +47,11 @@ export default function SlotsGrid({
       ) : slots.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           {slots.map((slot, idx) => {
+            const slotStartTime = new Date(slot.start).getTime()
+            const isPast = slotStartTime <= currentTime
             const isHoldingThisSlot = holdingSlotStart === slot.start
             const isHeldByOther = Boolean(slot.held)
-            const isAvailable = Boolean(slot.available) && !isHeldByOther
+            const isAvailable = Boolean(slot.available) && !isHeldByOther && !isPast
 
             return (
               <button
@@ -53,6 +66,8 @@ export default function SlotsGrid({
                     ? 'border-indigo-200 bg-indigo-50/40 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 text-indigo-900 shadow-sm cursor-pointer'
                     : isHeldByOther
                     ? 'border-amber-200 bg-amber-50 text-amber-700 cursor-not-allowed opacity-90'
+                    : isPast
+                    ? 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed line-through opacity-60'
                     : 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed line-through opacity-70'
                 }`}
               >
@@ -68,6 +83,8 @@ export default function SlotsGrid({
                       </svg>
                       Holding...
                     </>
+                  ) : isPast ? (
+                    'Past Slot'
                   ) : isAvailable ? (
                     'Click to Book'
                   ) : isHeldByOther ? (
