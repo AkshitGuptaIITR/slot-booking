@@ -2,19 +2,14 @@ from typing import Annotated
 
 from fastapi import Header
 
-from app.core.exceptions import AppException
+from app.core.exceptions import AppException, UnauthorizedException
 
 
 def get_current_user_id(
     x_user_id: Annotated[str | None, Header(alias="X-User-Id")] = None,
 ) -> str:
     if not x_user_id or not x_user_id.strip():
-        raise AppException(
-            status_code=400,
-            code="VALIDATION_ERROR",
-            message="Missing required header 'X-User-Id'",
-            details={"headers.x-user-id": "Header required"},
-        )
+        raise UnauthorizedException("Missing or empty required header 'X-User-Id'")
     return x_user_id.strip()
 
 

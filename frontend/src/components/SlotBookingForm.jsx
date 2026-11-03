@@ -60,7 +60,7 @@ export default function SlotBookingForm({
           {/* Quick Select Buttons (14 Days) */}
           <div className="mt-3">
             <p className="text-xs font-medium text-slate-600 mb-2">
-              Select from next 14 days (Weekends enabled):
+              Select from next 14 days (Monday to Friday only):
             </p>
             <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5 max-h-44 overflow-y-auto p-1.5 border border-slate-100 rounded-xl bg-slate-50/60">
               {availableDateList.map((item) => {
@@ -69,21 +69,24 @@ export default function SlotBookingForm({
                   <button
                     type="button"
                     key={item.dateStr}
+                    disabled={item.isWeekend}
                     onClick={() => onDateChange(item.dateStr)}
-                    className={`flex flex-col items-center justify-center py-2 px-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20 scale-[1.02]'
-                        : item.isWeekend
-                        ? 'bg-emerald-50/80 text-emerald-800 hover:bg-emerald-100 border border-emerald-200/70'
-                        : 'bg-white text-slate-700 hover:bg-indigo-50 border border-slate-200'
+                    className={`flex flex-col items-center justify-center py-2 px-1 rounded-lg text-xs font-medium transition-all ${
+                      item.isWeekend
+                        ? 'bg-slate-100/70 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
+                        : isSelected
+                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20 scale-[1.02] cursor-pointer'
+                        : 'bg-white text-slate-700 hover:bg-indigo-50 border border-slate-200 cursor-pointer'
                     }`}
-                    title={item.isWeekend ? `${item.dateStr} (Weekend)` : item.dateStr}
+                    title={item.isWeekend ? `${item.dateStr} (Weekend - Closed)` : item.dateStr}
                   >
                     <span className="text-[10px] uppercase tracking-wider opacity-80">
                       {item.dayName}
                     </span>
                     <span className="text-sm font-bold">{item.dayNum}</span>
-                    <span className="text-[9px] opacity-75">{item.month}</span>
+                    <span className="text-[9px] opacity-75">
+                      {item.isWeekend ? 'Closed' : item.month}
+                    </span>
                   </button>
                 )
               })}
@@ -96,8 +99,8 @@ export default function SlotBookingForm({
                 Selected: <strong className="text-slate-900">{formatDisplayDate(slotDate)}</strong>
               </span>
               {selectedDateItem?.isWeekend && (
-                <span className="text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                  Weekend booking available
+                <span className="text-amber-700 font-medium bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                  Closed on Weekends
                 </span>
               )}
             </div>

@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from fastapi.responses import JSONResponse
 
 from app.api.dependencies import get_current_user_id, get_idempotency_key
@@ -67,7 +67,7 @@ async def list_bookings(
 
 @router.delete(
     "/bookings/{booking_id}",
-    response_model=BookingResponse,
+    status_code=status.HTTP_204_NO_CONTENT,
     summary="Cancel an active booking",
 )
 async def delete_booking(
@@ -75,8 +75,9 @@ async def delete_booking(
     user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
-    return await cancel_booking(
+    await cancel_booking(
         booking_id=booking_id,
         user_id=user_id,
         db=db,
     )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

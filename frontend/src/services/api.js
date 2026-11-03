@@ -37,7 +37,7 @@ export async function createBooking(userId, slotStart, name, email, idempotencyK
       'Idempotency-Key': idempotencyKey,
     },
     body: JSON.stringify({
-      slot_start: slotStart,
+      slotStart,
       name,
       email,
     }),
@@ -58,6 +58,10 @@ export async function cancelBooking(userId, bookingId) {
       'X-User-Id': userId,
     },
   })
+
+  if (response.status === 204) {
+    return true
+  }
 
   const data = await response.json().catch(() => null)
   if (!response.ok) {

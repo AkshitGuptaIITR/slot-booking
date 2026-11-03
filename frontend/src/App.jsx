@@ -13,6 +13,7 @@ import {
   formatTime,
   formatDisplayDate,
   isMoreThanTwoHoursAway,
+  isWeekend,
 } from './utils/datetime'
 import {
   fetchSlots,
@@ -109,6 +110,12 @@ export default function App() {
       return
     }
 
+    if (isWeekend(val)) {
+      setErrorMsg('The consultant works Monday to Friday only. Please select a weekday.')
+      setSlots([])
+      return
+    }
+
     const trimmedUser = userName.trim()
     if (!trimmedUser) {
       setErrorMsg('Please enter your user name to view available slots.')
@@ -140,6 +147,12 @@ export default function App() {
 
     if (slotDate < minDate || slotDate > maxDate) {
       setErrorMsg(`Slot date must be between ${minDate} and ${maxDate} (within 14 days from today).`)
+      return
+    }
+
+    if (isWeekend(slotDate)) {
+      setErrorMsg('The consultant works Monday to Friday only. Please select a weekday.')
+      setSlots([])
       return
     }
 

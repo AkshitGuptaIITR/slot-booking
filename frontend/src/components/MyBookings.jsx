@@ -26,8 +26,9 @@ export default function MyBookings({
       ) : userBookings.length > 0 ? (
         <div className="space-y-2.5">
           {userBookings.map((b) => {
+            const slotStart = b.slotStart || b.slot_start
             const isActive = b.status === 'ACTIVE'
-            const cancellable = isActive && isMoreThanTwoHoursAway(b.slot_start)
+            const cancellable = isActive && isMoreThanTwoHoursAway(slotStart)
 
             return (
               <div
@@ -37,7 +38,7 @@ export default function MyBookings({
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-slate-900">
-                      {formatDateTime(b.slot_start)}
+                      {formatDateTime(slotStart)}
                     </span>
                     <span
                       className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
@@ -61,7 +62,7 @@ export default function MyBookings({
                       <button
                         type="button"
                         disabled={cancellingBookingId === b.id}
-                        onClick={() => onCancelBooking(b.id, b.slot_start)}
+                        onClick={() => onCancelBooking(b.id, slotStart)}
                         className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white border border-rose-200 hover:border-rose-600 transition-all cursor-pointer disabled:opacity-50"
                       >
                         {cancellingBookingId === b.id ? 'Cancelling...' : 'Cancel Booking'}

@@ -1,4 +1,4 @@
-import { formatDisplayDate, formatTime } from '../utils/datetime'
+import { formatDisplayDate, formatTime, isWeekend } from '../utils/datetime'
 
 export default function SlotsGrid({
   userName,
@@ -58,7 +58,11 @@ export default function SlotsGrid({
       ) : (
         !loadingSlots && (
           <div className="py-6 text-center text-sm text-slate-500">
-            {hasError ? 'No slots displayed due to error.' : 'No slots available for this date.'}
+            {hasError
+              ? 'No slots displayed due to error.'
+              : isWeekend(date)
+              ? 'The consultant is closed on weekends (Monday to Friday only).'
+              : 'No slots available for this date.'}
           </div>
         )
       )}

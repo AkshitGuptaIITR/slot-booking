@@ -42,6 +42,13 @@ export function isMoreThanTwoHoursAway(slotStartIso) {
   return slotTime >= twoHoursFromNow
 }
 
+export function isWeekend(dateStr) {
+  if (!dateStr) return false
+  const [year, month, day] = dateStr.split('-').map(Number)
+  const d = new Date(year, month - 1, day)
+  return d.getDay() === 0 || d.getDay() === 6
+}
+
 export function generate14DaysWindow() {
   const today = new Date()
   today.setHours(0, 0, 0, 0)

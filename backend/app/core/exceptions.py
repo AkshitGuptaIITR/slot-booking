@@ -12,8 +12,22 @@ class AppException(Exception):
         self.status_code = status_code
         self.code = code
         self.message = message
-        self.details = details
+        self.details = details if details is not None else {}
         super().__init__(message)
+
+
+class UnauthorizedException(AppException):
+    def __init__(
+        self,
+        message: str = "Missing or empty required header 'X-User-Id'",
+        details: Optional[Dict[str, Any]] = None,
+    ):
+        super().__init__(
+            status_code=401,
+            code="UNAUTHORIZED",
+            message=message,
+            details=details,
+        )
 
 
 class InvalidDateException(AppException):
@@ -92,15 +106,19 @@ class BookingAlreadyCancelledException(AppException):
         )
 
 
-class LateCancellationException(AppException):
+class CancellationWindowClosedException(AppException):
 
     def __init__(
         self,
         message: str = "Bookings cannot be cancelled within 2 hours of the slot start time",
     ):
         super().__init__(
-            status_code=400,
-            code="LATE_CANCELLATION",
+            status_code=409,
+            code="CANCELLATION_WINDOW_CLOSED",
             message=message,
         )
+
+
+# Backward compatibility alias
+LateCancellationException = CancellationWindowClosedException
 

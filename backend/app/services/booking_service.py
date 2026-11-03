@@ -10,9 +10,8 @@ from app.core.exceptions import (
     BookingLimitReachedException,
     IdempotencyKeyReusedException,
     SlotTakenException,
-    BookingAlreadyCancelledException,
     BookingNotFoundException,
-    LateCancellationException,
+    CancellationWindowClosedException,
 )
 from app.core.security import compute_request_hash
 from app.models.booking import Booking, BookingStatus
@@ -49,7 +48,7 @@ async def create_booking(
     Returns a tuple of (response_body_dict, status_code).
     """
     # 1. Compute request hash from payload
-    request_data = payload.model_dump(mode="json")
+    request_data = payload.model_dump(mode="json", by_alias=True)
     request_hash = compute_request_hash(request_data)
 
     # 2. Check Idempotency Record
@@ -69,7 +68,7 @@ async def create_booking(
                 "Idempotency key was previously used with a different request payload"
             )
 
-    # 3. Validate Slot Rules (aligned to 30 mins, 09:00-17:00 IST, 7 days/week, <= 14 days)
+    # 3. Validate Slot Rules (aligned to 30 mins, 09:00-17:00 IST, Monday-Friday, <= 14 days)
     validate_booking_slot(payload.slot_start)
 
     # 4. Transaction & Concurrency Control
@@ -120,7 +119,7 @@ async def create_booking(
     # 7. Prepare response payload
     response_body = {
         "id": str(new_booking.id),
-        "slot_start": new_booking.slot_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "slotStart": new_booking.slot_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "name": new_booking.name,
         "email": new_booking.email,
         "status": new_booking.status.value,
@@ -145,33 +144,34 @@ async def create_booking(
 
 async def cancel_booking(
     booking_id: uuid.UUID, user_id: str, db: AsyncSession
-) -> Booking:
+) -> None:
     """Cancels an upcoming active booking for the authenticated user.
 
-    Treats non-existent, unowned, or past bookings uniformly as 404 NOT_FOUND.
+    - Returns 404 NOT_FOUND for non-existent or other users' bookings.
+    - Idempotent: returns without error (204) if the booking is already cancelled.
+    - Returns 409 CANCELLATION_WINDOW_CLOSED if within 2 hours of slot start (or already past).
     """
     now_utc = datetime.now(timezone.utc)
 
-    # 1. Fetch only if the booking belongs to user AND is scheduled in the future
+    # 1. Fetch the booking scoped to user_id
     stmt = (
         select(Booking)
         .where(
             Booking.id == booking_id,
             Booking.user_id == user_id,
-            Booking.slot_start > now_utc,
         )
         .with_for_update()
     )
     result = await db.execute(stmt)
     booking = result.scalar_one_or_none()
 
-    # 2. Return 404 for missing, unowned, or expired bookings
+    # 2. Return 404 for missing or unowned bookings
     if not booking:
         raise BookingNotFoundException("Booking not found")
 
-    # 3. Check if an upcoming booking is already cancelled
+    # 3. Cancelling an already-cancelled booking is idempotent (returns 204)
     if booking.status == BookingStatus.CANCELLED:
-        raise BookingAlreadyCancelledException("Booking is already cancelled")
+        return
 
     # 4. Check 2-hour minimum notice requirement
     slot_start = booking.slot_start
@@ -179,7 +179,7 @@ async def cancel_booking(
         slot_start = slot_start.replace(tzinfo=timezone.utc)
 
     if slot_start < now_utc + timedelta(hours=2):
-        raise LateCancellationException(
+        raise CancellationWindowClosedException(
             "Bookings cannot be cancelled within 2 hours of the slot start time"
         )
 
@@ -188,6 +188,3 @@ async def cancel_booking(
     booking.cancelled_at = now_utc
 
     await db.commit()
-    await db.refresh(booking)
-
-    return booking
