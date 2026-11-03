@@ -39,9 +39,6 @@ def validate_booking_slot(slot_start: datetime) -> None:
 
     slot_ist = slot_start.astimezone(KOLKATA_TZ)
 
-    if slot_ist.weekday() >= 5:
-        raise InvalidSlotException("Consultant does not work on weekends")
-
     earliest_slot_time = time(WORK_START_HOUR, 0)
     latest_slot_time = time(WORK_END_HOUR - 1, 30)
 
@@ -70,10 +67,6 @@ async def get_slots_for_date(
     db: AsyncSession,
 ) -> list[SlotResponse]:
     target_date = parse_calendar_date(date_str)
-
-    # Monday is 0, Sunday is 6. Consultant only works Monday to Friday.
-    if target_date.weekday() >= 5:
-        return []
 
     # 1. Define working hours in Asia/Kolkata
     day_start_ist = datetime.combine(

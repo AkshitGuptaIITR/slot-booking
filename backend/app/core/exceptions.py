@@ -90,3 +90,17 @@ class BookingAlreadyCancelledException(AppException):
             code="ALREADY_CANCELLED",
             message=message,
         )
+
+
+class LateCancellationException(AppException):
+
+    def __init__(
+        self,
+        message: str = "Bookings cannot be cancelled within 2 hours of the slot start time",
+    ):
+        super().__init__(
+            status_code=400,
+            code="LATE_CANCELLATION",
+            message=message,
+        )
+

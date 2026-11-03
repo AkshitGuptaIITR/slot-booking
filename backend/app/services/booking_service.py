@@ -1,5 +1,5 @@
 # backend/app/services/booking_service.py
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Sequence
 import uuid
 from sqlalchemy import func, select, text
@@ -12,6 +12,7 @@ from app.core.exceptions import (
     SlotTakenException,
     BookingAlreadyCancelledException,
     BookingNotFoundException,
+    LateCancellationException,
 )
 from app.core.security import compute_request_hash
 from app.models.booking import Booking, BookingStatus
@@ -68,7 +69,7 @@ async def create_booking(
                 "Idempotency key was previously used with a different request payload"
             )
 
-    # 3. Validate Slot Rules (aligned to 30 mins, 09:00-17:00 IST, Mon-Fri, <= 14 days)
+    # 3. Validate Slot Rules (aligned to 30 mins, 09:00-17:00 IST, 7 days/week, <= 14 days)
     validate_booking_slot(payload.slot_start)
 
     # 4. Transaction & Concurrency Control
@@ -172,7 +173,17 @@ async def cancel_booking(
     if booking.status == BookingStatus.CANCELLED:
         raise BookingAlreadyCancelledException("Booking is already cancelled")
 
-    # 4. Mutate status and update cancellation timestamp
+    # 4. Check 2-hour minimum notice requirement
+    slot_start = booking.slot_start
+    if slot_start.tzinfo is None:
+        slot_start = slot_start.replace(tzinfo=timezone.utc)
+
+    if slot_start < now_utc + timedelta(hours=2):
+        raise LateCancellationException(
+            "Bookings cannot be cancelled within 2 hours of the slot start time"
+        )
+
+    # 5. Mutate status and update cancellation timestamp
     booking.status = BookingStatus.CANCELLED
     booking.cancelled_at = now_utc
 
