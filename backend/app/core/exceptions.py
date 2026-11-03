@@ -33,3 +33,15 @@ class InvalidSlotException(AppException):
             message=message,
             details=details,
         )
+
+
+class IdempotencyKeyReusedException(AppException):
+    def __init__(
+        self,
+        message: str = "Idempotency key was previously used with a different request payload",
+    ):
+        super().__init__(
+            status_code=422,
+            code="IDEMPOTENCY_KEY_REUSED",
+            message=message,
+        )
