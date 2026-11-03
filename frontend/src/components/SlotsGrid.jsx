@@ -5,6 +5,7 @@ export default function SlotsGrid({
   date,
   slots,
   loadingSlots,
+  holdingSlotStart,
   onRefresh,
   onSelectSlot,
   hasError,
@@ -34,26 +35,53 @@ export default function SlotsGrid({
         </div>
       ) : slots.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          {slots.map((slot, idx) => (
-            <button
-              key={slot.start || idx}
-              type="button"
-              disabled={!slot.available}
-              onClick={() => onSelectSlot(slot)}
-              className={`p-3 rounded-xl border text-center transition-all ${
-                slot.available
-                  ? 'border-indigo-200 bg-indigo-50/40 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 text-indigo-900 shadow-sm cursor-pointer'
-                  : 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed line-through opacity-70'
-              }`}
-            >
-              <div className="text-xs font-semibold">
-                {formatTime(slot.start)} - {formatTime(slot.end)}
-              </div>
-              <div className="text-[10px] mt-1 font-medium">
-                {slot.available ? 'Click to Book' : 'Booked'}
-              </div>
-            </button>
-          ))}
+          {slots.map((slot, idx) => {
+            const isHoldingThisSlot = holdingSlotStart === slot.start
+            const isHeldByOther = Boolean(slot.held)
+            const isAvailable = Boolean(slot.available) && !isHeldByOther
+
+            return (
+              <button
+                key={slot.start || idx}
+                type="button"
+                disabled={!isAvailable || Boolean(holdingSlotStart)}
+                onClick={() => onSelectSlot(slot)}
+                className={`p-3 rounded-xl border text-center transition-all ${
+                  isHoldingThisSlot
+                    ? 'border-indigo-400 bg-indigo-100/70 text-indigo-900 cursor-wait shadow-sm'
+                    : isAvailable
+                    ? 'border-indigo-200 bg-indigo-50/40 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 text-indigo-900 shadow-sm cursor-pointer'
+                    : isHeldByOther
+                    ? 'border-amber-200 bg-amber-50 text-amber-700 cursor-not-allowed opacity-90'
+                    : 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed line-through opacity-70'
+                }`}
+              >
+                <div className="text-xs font-semibold">
+                  {formatTime(slot.start)} - {formatTime(slot.end)}
+                </div>
+                <div className="text-[10px] mt-1 font-medium flex items-center justify-center gap-1">
+                  {isHoldingThisSlot ? (
+                    <>
+                      <svg className="animate-spin h-2.5 w-2.5 text-indigo-600" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                      </svg>
+                      Holding...
+                    </>
+                  ) : isAvailable ? (
+                    'Click to Book'
+                  ) : isHeldByOther ? (
+                    <>
+                      <span>⏳</span>
+                      <span>On Hold</span>
+                    </>
+                  ) : (
+                    'Booked'
+                  )}
+                </div>
+              </button>
+            )
+          })}
         </div>
       ) : (
         !loadingSlots && (

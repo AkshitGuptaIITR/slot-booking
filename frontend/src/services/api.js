@@ -13,6 +13,39 @@ export async function fetchSlots(userId, date) {
   return response.json()
 }
 
+export async function holdSlot(userId, slotStart) {
+  const response = await fetch('/api/slots/hold', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-User-Id': userId,
+    },
+    body: JSON.stringify({ slotStart }),
+  })
+
+  const data = await response.json().catch(() => null)
+  if (!response.ok) {
+    const error = new Error(data?.error?.message || 'Failed to hold slot.')
+    error.code = data?.error?.code
+    throw error
+  }
+
+  return data
+}
+
+export async function releaseSlotHold(userId, slotStart) {
+  const response = await fetch('/api/slots/release-hold', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-User-Id': userId,
+    },
+    body: JSON.stringify({ slotStart }),
+  })
+
+  return response.json().catch(() => null)
+}
+
 export async function fetchUserBookings(userId) {
   const response = await fetch('/api/bookings', {
     headers: {

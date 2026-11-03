@@ -71,6 +71,16 @@ class SlotTakenException(AppException):
         )
 
 
+class SlotHeldException(AppException):
+
+    def __init__(self, message: str = "This slot is temporarily on hold by another user"):
+        super().__init__(
+            status_code=409,
+            code="SLOT_HELD",
+            message=message,
+        )
+
+
 class BookingLimitReachedException(AppException):
 
     def __init__(

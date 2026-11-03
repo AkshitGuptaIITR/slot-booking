@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { formatDisplayDate, formatTime } from '../utils/datetime'
 
 export default function BookingModal({
@@ -11,8 +12,38 @@ export default function BookingModal({
   isSubmitting,
   modalError,
   setModalError,
+  initialHoldSeconds = 120,
 }) {
+  const [secondsLeft, setSecondsLeft] = useState(initialHoldSeconds)
+
+  // Sync initial seconds whenever a new slot is opened
+  useEffect(() => {
+    setSecondsLeft(initialHoldSeconds)
+  }, [slot, initialHoldSeconds])
+
+  // 1-second countdown interval
+  useEffect(() => {
+    if (!slot) return
+
+    const timer = setInterval(() => {
+      setSecondsLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [slot])
+
   if (!slot) return null
+
+  const isExpired = secondsLeft <= 0
+  const minutes = Math.floor(secondsLeft / 60)
+  const seconds = secondsLeft % 60
+  const formattedCountdown = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
@@ -22,7 +53,7 @@ export default function BookingModal({
           <div>
             <h3 className="text-lg font-bold text-slate-900">Confirm Slot Booking</h3>
             <p className="text-xs text-slate-500">
-              Please provide your email to confirm this appointment.
+              Complete your booking before your temporary hold expires.
             </p>
           </div>
           <button
@@ -33,6 +64,42 @@ export default function BookingModal({
           >
             ✕
           </button>
+        </div>
+
+        {/* Temporary Hold Countdown Badge */}
+        <div
+          className={`rounded-xl p-3 flex items-center justify-between text-xs transition-colors ${
+            isExpired
+              ? 'bg-rose-50 text-rose-800 border border-rose-200'
+              : secondsLeft < 30
+              ? 'bg-amber-50 text-amber-900 border border-amber-200 animate-pulse'
+              : 'bg-emerald-50 text-emerald-900 border border-emerald-200'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-base">{isExpired ? '⚠️' : '🔒'}</span>
+            <div>
+              <span className="font-bold">
+                {isExpired ? 'Hold Expired' : 'Slot Held Exclusively For You'}
+              </span>
+              <p className="text-[11px] opacity-80">
+                {isExpired
+                  ? 'Your reservation window closed. Please select the slot again.'
+                  : 'Other users cannot book this slot while you complete the form.'}
+              </p>
+            </div>
+          </div>
+          <div
+            className={`font-mono font-bold text-sm px-2.5 py-1 rounded-lg ${
+              isExpired
+                ? 'bg-rose-200/80 text-rose-900'
+                : secondsLeft < 30
+                ? 'bg-amber-200/80 text-amber-900'
+                : 'bg-emerald-200/80 text-emerald-950'
+            }`}
+          >
+            {formattedCountdown}
+          </div>
         </div>
 
         {/* Selected Slot Information */}
@@ -69,35 +136,13 @@ export default function BookingModal({
               }}
               placeholder="e.g. yourname@example.com"
               autoFocus
+              disabled={isExpired || isSubmitting}
               required
-              className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-100 disabled:cursor-not-allowed"
             />
             <p className="mt-1 text-[11px] text-slate-500">
               Required by the booking system for confirmation and verification.
             </p>
-          </div>
-
-          {/* Soft Warnings / Booking Policy Notice */}
-          <div className="rounded-xl bg-amber-50/90 border border-amber-200/80 p-3.5 text-xs text-amber-900 space-y-1.5">
-            <div className="flex items-center gap-1.5 font-bold text-amber-950">
-              <svg className="w-4 h-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <span>Important Booking Guidelines:</span>
-            </div>
-            <ul className="list-disc list-inside space-y-1 text-[11px] text-amber-800/95 pl-1 leading-relaxed">
-              <li>
-                <strong className="font-semibold">Maximum 2 active slots:</strong> Each user can hold at most 2 active upcoming bookings concurrently.
-              </li>
-              <li>
-                <strong className="font-semibold">2-Hour cancellation notice:</strong> Bookings can only be cancelled up to 2 hours before the slot begins.
-              </li>
-            </ul>
           </div>
 
           {/* Modal Error */}
@@ -127,7 +172,7 @@ export default function BookingModal({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isExpired}
               className="px-5 py-2.5 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-500/20 active:scale-[0.99] transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
@@ -138,6 +183,8 @@ export default function BookingModal({
                   </svg>
                   Booking...
                 </>
+              ) : isExpired ? (
+                'Hold Expired'
               ) : (
                 'Confirm & Book Slot'
               )}

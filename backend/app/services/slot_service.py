@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import InvalidDateException, InvalidSlotException
 from app.models.booking import Booking, BookingStatus
 from app.schemas.slot import SlotResponse
+from app.services.hold_service import hold_service
 
 KOLKATA_TZ = ZoneInfo("Asia/Kolkata")
 SLOT_DURATION_MINUTES = 30
@@ -70,6 +71,7 @@ def parse_calendar_date(date_str: str) -> date:
 async def get_slots_for_date(
     date_str: str,
     db: AsyncSession,
+    user_id: str | None = None,
 ) -> list[SlotResponse]:
     target_date = parse_calendar_date(date_str)
 
@@ -110,22 +112,26 @@ async def get_slots_for_date(
 
         slot_start_utc = current_ist.astimezone(timezone.utc)
         slot_end_utc = slot_end_ist.astimezone(timezone.utc)
+        slot_start_iso = slot_start_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
 
         # A slot is available ONLY if:
         # - It is not already booked
+        # - It is not currently held by another user
         # - It is not in the past
         # - It is not more than 14 days in the future
         is_booked = slot_start_utc in booked_starts
+        is_held = hold_service.is_held_by_other(slot_start_iso, user_id) if user_id else False
         is_past = slot_start_utc <= now_utc
         is_too_far = slot_start_utc > max_advance_utc
 
-        is_available = not (is_booked or is_past or is_too_far)
+        is_available = not (is_booked or is_held or is_past or is_too_far)
 
         slots.append(
             SlotResponse(
                 start=slot_start_utc,
                 end=slot_end_utc,
                 available=is_available,
+                held=is_held,
             )
         )
         current_ist = slot_end_ist

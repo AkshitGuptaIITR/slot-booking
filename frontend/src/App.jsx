@@ -20,6 +20,8 @@ import {
   fetchUserBookings,
   createBooking,
   cancelBooking,
+  holdSlot,
+  releaseSlotHold,
 } from './services/api'
 
 export default function App() {
@@ -37,9 +39,11 @@ export default function App() {
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [loadingBookings, setLoadingBookings] = useState(false)
   const [cancellingBookingId, setCancellingBookingId] = useState(null)
+  const [holdingSlotStart, setHoldingSlotStart] = useState(null)
 
   // Booking confirmation modal state
   const [activeSlotModal, setActiveSlotModal] = useState(null)
+  const [holdSeconds, setHoldSeconds] = useState(120)
   const [bookingEmail, setBookingEmail] = useState('')
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false)
   const [modalError, setModalError] = useState('')
@@ -98,37 +102,29 @@ export default function App() {
   }
 
   // Date selection (instantly fetches slots if user name exists)
-  const handleDateChange = (val) => {
-    setSlotDate(val)
+  const handleDateChange = (newDate) => {
+    setSlotDate(newDate)
     setErrorMsg('')
     setBookingSuccessMsg('')
 
-    if (!val) return
-
-    if (val < minDate || val > maxDate) {
-      setErrorMsg(`Slot date must be between ${minDate} and ${maxDate} (within 14 days from today).`)
+    const trimmedUser = userName.trim()
+    if (!trimmedUser) {
       return
     }
 
-    if (isWeekend(val)) {
+    if (isWeekend(newDate)) {
       setErrorMsg('The consultant works Monday to Friday only. Please select a weekday.')
       setSlots([])
       return
     }
 
-    const trimmedUser = userName.trim()
-    if (!trimmedUser) {
-      setErrorMsg('Please enter your user name to view available slots.')
-      return
-    }
-
     setSubmittedUser(trimmedUser)
-    setSubmittedDate(val)
-    handleFetchSlots(trimmedUser, val)
+    setSubmittedDate(newDate)
+    handleFetchSlots(trimmedUser, newDate)
     handleFetchBookings(trimmedUser)
   }
 
-  // Explicit form submission
+  // Search / View Slots form submission
   const handleSubmit = (e) => {
     e.preventDefault()
     setErrorMsg('')
@@ -136,17 +132,22 @@ export default function App() {
 
     const trimmedUser = userName.trim()
     if (!trimmedUser) {
-      setErrorMsg('Please enter your user name.')
+      setErrorMsg('Please enter your name.')
       return
     }
 
     if (!slotDate) {
-      setErrorMsg('Please select a slot date.')
+      setErrorMsg('Please select a date to view available slots.')
       return
     }
 
-    if (slotDate < minDate || slotDate > maxDate) {
-      setErrorMsg(`Slot date must be between ${minDate} and ${maxDate} (within 14 days from today).`)
+    if (slotDate < minDate) {
+      setErrorMsg('Cannot view or book slots for past dates.')
+      return
+    }
+
+    if (slotDate > maxDate) {
+      setErrorMsg('Slots can only be viewed or booked up to 14 days in advance.')
       return
     }
 
@@ -162,19 +163,38 @@ export default function App() {
     handleFetchBookings(trimmedUser)
   }
 
-  // Open booking modal
-  const handleOpenBookingModal = (slot) => {
-    setActiveSlotModal(slot)
-    setModalError('')
+  // Open booking modal - Acquired hold before opening
+  const handleOpenBookingModal = async (slot) => {
+    if (!submittedUser) return
     setErrorMsg('')
     setBookingSuccessMsg('')
+    setHoldingSlotStart(slot.start)
+
+    try {
+      const holdData = await holdSlot(submittedUser, slot.start)
+      setHoldSeconds(holdData.remainingSeconds || 120)
+      setActiveSlotModal(slot)
+      setModalError('')
+    } catch (err) {
+      // Hold failed (someone else held or booked it in the meantime)
+      setErrorMsg(err.message || 'This slot is temporarily on hold by another user.')
+      handleFetchSlots(submittedUser, submittedDate)
+    } finally {
+      setHoldingSlotStart(null)
+    }
   }
 
-  // Close booking modal
+  // Close booking modal - Releases hold immediately
   const handleCloseModal = () => {
     if (isSubmittingBooking) return
+
+    if (activeSlotModal && submittedUser) {
+      releaseSlotHold(submittedUser, activeSlotModal.start).catch(() => {})
+    }
+
     setActiveSlotModal(null)
     setModalError('')
+    handleFetchSlots(submittedUser, submittedDate)
   }
 
   // Submit booking from modal
@@ -288,6 +308,7 @@ export default function App() {
             date={submittedDate}
             slots={slots}
             loadingSlots={loadingSlots}
+            holdingSlotStart={holdingSlotStart}
             onRefresh={() => handleFetchSlots(submittedUser, submittedDate)}
             onSelectSlot={handleOpenBookingModal}
             hasError={Boolean(errorMsg)}
@@ -295,7 +316,7 @@ export default function App() {
         )}
       </div>
 
-      {/* Confirmation & Email Modal */}
+      {/* Confirmation & Email Modal with Hold Countdown */}
       <BookingModal
         slot={activeSlotModal}
         date={submittedDate}
@@ -307,6 +328,7 @@ export default function App() {
         isSubmitting={isSubmittingBooking}
         modalError={modalError}
         setModalError={setModalError}
+        initialHoldSeconds={holdSeconds}
       />
     </div>
   )
