@@ -8,12 +8,14 @@ Designed with strict ACID guarantees, multi-layer concurrency control, and zero-
 
 ## 📑 Table of Contents
 1. [Core Business Rules](#-core-business-rules)
-2. [Architecture & Tech Stack](#-architecture--tech-stack)
-3. [Installation & Setup](#-installation--setup)
-4. [Running the Application](#-running-the-application)
-5. [Running Automated Tests](#-running-automated-tests)
-6. [Edge Cases Identified & Resolved](#-edge-cases-identified--resolved)
-7. [Known Limitations](#-known-limitations)
+2. [Tech Stack](#-tech-stack)
+3. [Architecture & Project Structure](#-architecture--project-structure)
+4. [Preliminary Requirements](#-preliminary-requirements)
+5. [Installation & Setup](#-installation--setup)
+6. [Running the Application](#-running-the-application)
+7. [Running Automated Tests](#-running-automated-tests)
+8. [Edge Cases Identified & Resolved](#-edge-cases-identified--resolved)
+9. [Known Limitations](#-known-limitations)
 
 ---
 
@@ -28,76 +30,166 @@ Designed with strict ACID guarantees, multi-layer concurrency control, and zero-
 
 ---
 
-## 🏗 Architecture & Tech Stack
+## 💻 Tech Stack
+
+### Frontend
+| Technology | Version | Purpose |
+| :--- | :--- | :--- |
+| **[React](https://react.dev/)** | `19.x` | Modern reactive UI framework utilizing React 19 concurrent features |
+| **[React Compiler](https://react.dev/learn/react-compiler)** | `1.0.0` | Automatic memoization of components and hooks without manual `useMemo` / `useCallback` overhead |
+| **[Vite](https://vitejs.dev/)** | `8.x` | Next-generation frontend build tool, local dev server, and HMR engine with built-in API proxy |
+| **[Tailwind CSS](https://tailwindcss.com/)** | `4.x` | Utility-first styling with `@tailwindcss/vite` for responsive, accessible UI components |
+| **[Fetch API & Custom Services](frontend/src/services/api.js)** | Native | Decoupled client service layer handling slot fetching, holds, reservations, idempotency, and cancellation |
+
+### Backend
+| Technology | Version | Purpose |
+| :--- | :--- | :--- |
+| **[Python](https://www.python.org/)** | `3.11+` | Core language runtime leveraging native async/await performance and typing improvements |
+| **[FastAPI](https://fastapi.tiangolo.com/)** | `0.162+` | High-performance async web framework with automatic OpenAPI / Swagger generation |
+| **[Uvicorn](https://www.uvicorn.org/)** | `0.54+` | Lightning-fast ASGI web server implementation |
+| **[Pydantic v2](https://docs.pydantic.dev/)** | `2.14+` | High-speed data validation, request parsing, and response serialization |
+| **[SQLAlchemy (Asyncio)](https://www.sqlalchemy.org/)** | `2.0+` | Modern asynchronous ORM enabling non-blocking database queries, savepoints, and row locking |
+| **[asyncpg](https://github.com/MagicStack/asyncpg)** | `0.32+` | High-performance asynchronous PostgreSQL database driver for Python |
+| **[Alembic](https://alembic.sqlalchemy.org/)** | `1.20+` | Schema migration management and version-controlled database schema evolution |
+| **[Pytz](https://pythonhosted.org/pytz/) & [python-dateutil](https://dateutil.readthedocs.io/)** | Latest | Exact timezone translations (`Asia/Kolkata` IST & `UTC`) and working calendar boundaries |
+
+### Database & Concurrency Control
+| Component | Implementation | Purpose |
+| :--- | :--- | :--- |
+| **[PostgreSQL](https://www.postgresql.org/)** | `14+` | Primary ACID-compliant relational data store |
+| **Transaction Advisory Locks** | `pg_advisory_xact_lock` | Serializes booking creation per `user_id` to guarantee the 2-booking quota without table-level locking |
+| **Partial Unique Index** | `idx_unique_active_slot` | Enforces single-active-booking constraint at the database engine level on `(slot_start)` where `status = 'ACTIVE'` |
+| **Row-Level Locking** | `SELECT ... FOR UPDATE` | Prevents race conditions during booking cancellations and validation checks |
+| **In-Memory Hold Registry** | `InMemoryHoldService` | Thread-safe 2-minute ephemeral slot reservation with TTL countdown and automatic lazy pruning |
+
+### Development, Testing & Code Quality
+* **Pytest & Pytest-Asyncio**: Automated testing suite covering concurrent booking attempts, advisory lock serialization, and hold lifecycles.
+* **HTTPX**: Async HTTP client for integration and end-to-end API testing.
+* **Ruff**: Blazing fast Python code linter and formatter.
+* **ESLint**: JavaScript and React syntax verification and hooks linting.
+
+---
+
+## 🏗 Architecture & Project Structure
 
 ```
 slot-booking/
 ├── backend/
+│   ├── alembic/          # Database migrations
 │   ├── app/
-│   │   ├── api/          # FastAPI routes & dependency injection
+│   │   ├── api/          # FastAPI route controllers & dependency injection
 │   │   ├── core/         # Custom exceptions, security hashing, settings
 │   │   ├── db/           # Async SQLAlchemy engine & base model
 │   │   ├── models/       # Database entities (Booking, IdempotencyRecord)
 │   │   ├── schemas/      # Pydantic v2 validation models
 │   │   └── services/     # Business logic, hold service, DB advisory lock service
-│   ├── alembic/          # Database migrations
-│   └── tests/            # Pytest async test suite (holds, concurrency, idempotency)
+│   ├── tests/            # Pytest async test suite (holds, concurrency, idempotency)
+│   ├── .env.example      # Sample backend environment configuration
+│   └── pyproject.toml    # Backend dependencies and project metadata
 ├── frontend/
-│   └── src/
-│       ├── components/   # Header, SlotBookingForm, SlotsGrid, BookingModal, MyBookings
-│       ├── services/     # API client (fetch, hold, release, book, cancel)
-│       └── utils/        # IST & UTC date-time calculations, validation helpers
+│   ├── src/
+│   │   ├── components/   # Header, SlotBookingForm, SlotsGrid, BookingModal, MyBookings
+│   │   ├── services/     # API client (fetch, hold, release, book, cancel)
+│   │   └── utils/        # IST & UTC date-time calculations, validation helpers
+│   ├── package.json      # Frontend dependencies and scripts
+│   └── vite.config.js    # Vite configuration with proxy and React Compiler plugin
+└── README.md
 ```
 
-* **Backend**: Python 3.11+, FastAPI, SQLAlchemy 2.0 (Asyncio), PostgreSQL (`asyncpg`), Alembic, Pydantic v2.
-* **Frontend**: React 19 (React Compiler enabled), Vite, Tailwind CSS.
+---
+
+## 📋 Preliminary Requirements
+
+Before installing and running the application locally, ensure your machine satisfies the following preliminary requirements:
+
+### 1. System & Runtime Dependencies
+* **Python**: `3.11` or higher
+  * Verify with: `python --version` (or `python3 --version`)
+  * Ensure `pip` and `venv` module are available.
+* **Node.js**: `18.0.0` or higher (LTS 20.x or 22.x recommended)
+  * Verify with: `node --version`
+  * Includes `npm` (v9+): verify with `npm --version`
+* **PostgreSQL**: `14.0` or higher
+  * PostgreSQL server must be installed, active, and accepting connections.
+  * Verify with: `psql --version` or check if the PostgreSQL service is running (`pg_isready -h localhost -p 5432`).
+* **Git**: Installed for cloning and version control.
+
+### 2. Network Ports
+Ensure the following local network ports are free and not occupied by other services:
+* **Port `5432`**: PostgreSQL database service
+* **Port `8000`**: Backend FastAPI server (`uvicorn`)
+* **Port `5173`**: Frontend Vite development server
+
+### 3. Database Credentials & Access
+* You must have administrative or user privileges in PostgreSQL to create a new database (e.g., `slotbook`).
+* Note your PostgreSQL username, password, host, and port (default: `postgres`, `localhost`, `5432`).
 
 ---
 
 ## ⚙️ Installation & Setup
 
-### Prerequisites
-* **Python**: 3.11 or higher
-* **Node.js**: 18.0.0 or higher (with `npm`)
-* **PostgreSQL**: 14+ running locally or accessible via network
+### 1. Create the Database
+Connect to your local PostgreSQL instance using `psql` or your preferred GUI (pgAdmin, DBeaver, TablePlus):
 
----
+```bash
+# Connect via psql CLI
+psql -U postgres
+```
 
-### 1. Database Setup
-Create a PostgreSQL database for the project:
+Inside the PostgreSQL prompt, create the database:
 ```sql
 CREATE DATABASE slotbook;
+\q
 ```
 
 ---
 
 ### 2. Backend Setup
 
-1. Open a terminal in the `backend/` directory:
+1. Open a terminal and navigate to the `backend/` directory:
    ```bash
    cd backend
    ```
 
 2. Create and activate a Python virtual environment:
-   ```bash
-   # Windows (PowerShell)
-   python -m venv .venv
-   .venv\Scripts\Activate.ps1
-
-   # Linux / macOS
-   python3 -m venv .venv
-   source .venv/bin/activate
-   ```
+   * **Windows (PowerShell)**:
+     ```powershell
+     python -m venv .venv
+     .venv\Scripts\Activate.ps1
+     ```
+   * **Linux / macOS**:
+     ```bash
+     python3 -m venv .venv
+     source .venv/bin/activate
+     ```
 
 3. Install backend dependencies:
-   ```bash
-   pip install -e ".[dev]"
-   ```
+   * **Using pip**:
+     ```bash
+     pip install -e ".[dev]"
+     ```
+   * *Alternatively, if using [uv](https://github.com/astral-sh/uv)*:
+     ```bash
+     uv sync
+     ```
 
-4. Configure environment variables in `backend/.env`:
+4. Configure environment variables:
+   Copy the provided `.env.example` file to `.env`:
+   * **Windows (PowerShell)**:
+     ```powershell
+     Copy-Item .env.example .env
+     ```
+   * **Linux / macOS**:
+     ```bash
+     cp .env.example .env
+     ```
+
+   Edit `backend/.env` with your PostgreSQL credentials:
    ```env
    DATABASE_URL=postgresql+asyncpg://<username>:<password>@localhost:5432/slotbook
    ```
+   > [!NOTE]
+   > Ensure the connection string uses the `postgresql+asyncpg://` scheme for SQLAlchemy's asynchronous driver.
 
 5. Apply database migrations:
    ```bash
@@ -108,12 +200,12 @@ CREATE DATABASE slotbook;
 
 ### 3. Frontend Setup
 
-1. Open a terminal in the `frontend/` directory:
+1. Open a new terminal and navigate to the `frontend/` directory:
    ```bash
    cd frontend
    ```
 
-2. Install dependencies:
+2. Install Node dependencies:
    ```bash
    npm install
    ```
@@ -122,21 +214,22 @@ CREATE DATABASE slotbook;
 
 ## 🚀 Running the Application
 
-### 1. Start the Backend API
-From the `backend/` directory with your virtual environment active:
+### 1. Start the Backend API Server
+From the `backend/` directory with the virtual environment activated:
 ```bash
 uvicorn app.main:app --reload --port 8000
 ```
-* **API Server**: `http://localhost:8000`
-* **Interactive Swagger Docs**: `http://localhost:8000/docs`
+* **API Base URL**: `http://localhost:8000`
+* **Interactive Swagger Documentation**: `http://localhost:8000/docs`
+* **Alternative Redoc Documentation**: `http://localhost:8000/redoc`
 
 ### 2. Start the Frontend Development Server
 From the `frontend/` directory:
 ```bash
 npm run dev
 ```
-* **Web UI**: `http://localhost:5173`
-* Vite automatically proxies `/api/*` calls to the FastAPI backend (`http://localhost:8000`).
+* **Web Application UI**: `http://localhost:5173`
+* Vite automatically proxies all `/api/*` requests directly to `http://localhost:8000`, bypassing CORS hurdles during development.
 
 ---
 
